@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import yfinance as yf
-from scipy import stats
+import math
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -398,7 +398,23 @@ def run_backtest(signal_df, mkt_prob, stake_amt):
 
     tweet_ret    = signal_df[signal_df['has_tweet']]['port_return'].dropna()
     no_tweet_ret = signal_df[~signal_df['has_tweet']]['port_return'].dropna()
-    _, p_val = stats.ttest_ind(tweet_ret, no_tweet_ret) if len(no_tweet_ret) > 1 else (0, 1)
+    
+    if len(no_tweet_ret) > 1 and len(tweet_ret) > 1:
+        mean1, mean2 = tweet_ret.mean(), no_tweet_ret.mean()
+        var1, var2 = tweet_ret.var(ddof=1), no_tweet_ret.var(ddof=1)
+        n1, n2 = len(tweet_ret), len(no_tweet_ret)
+        
+        # Welch's t-test statistic
+        se = np.sqrt(var1/n1 + var2/n2)
+        t_stat = (mean1 - mean2) / se if se > 0 else 0
+        
+        # Normal approximation for p-value (two-tailed)
+        def norm_cdf(x):
+            return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+            
+        p_val = 2 * (1 - norm_cdf(abs(t_stat)))
+    else:
+        p_val = 1.0
 
     baseline_wr = (no_tweet_ret > 0).mean()
 
