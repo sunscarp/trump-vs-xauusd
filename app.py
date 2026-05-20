@@ -951,10 +951,22 @@ with tab4:
     st.markdown('<div class="section-sub">Next-day return effect for each ticker individually</div>', unsafe_allow_html=True)
 
     asset_rows = []
+    # `close` may not exist when a local `port_ret` Series is used (XAU_daily.csv).
+    # If so, use `port_ret` directly for the single-ticker case.
     for tkr in tickers:
-        if tkr not in close.columns:
-            continue
-        tkr_ret = (close[tkr].pct_change() * 100).rename('daily_return')
+        if 'close' in globals():
+            if tkr not in close.columns:
+                continue
+            tkr_ret = (close[tkr].pct_change() * 100).rename('daily_return')
+        else:
+            # port_ret may be a Series of daily returns for the single-ticker local file
+            if isinstance(port_ret, pd.Series):
+                # only serve the matching single ticker
+                if len(tickers) != 1:
+                    continue
+                tkr_ret = port_ret.rename('daily_return')
+            else:
+                continue
         a_df    = build_analysis_df(trump_df, cutoff_hour, sent_filter, tkr_ret)
         r3      = run_backtest(a_df, starting_capital)
         if r3:
